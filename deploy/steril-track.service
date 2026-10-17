@@ -1,0 +1,17 @@
+[Unit]
+Description=Steril Track Next.js
+After=network.target
+[Service]
+Type=simple
+User=steril
+Group=steril
+WorkingDirectory=/opt/steril-track
+ExecStart=/usr/bin/node /opt/steril-track/node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3000
+Restart=on-failure
+Environment=NODE_ENV=production
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/steril-track/data /opt/steril-track/backups /opt/steril-track/.next
+[Install]
+WantedBy=multi-user.target

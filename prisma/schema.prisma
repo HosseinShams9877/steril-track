@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+model Tenant {
+ id String @id
+ name String
+ owner String
+ created String
+ members Member[]
+ equipment Equipment[]
+ @@map("tenants")
+}
+model Member {
+ tenantId String @map("tenantID")
+ email String
+ role String
+ tenant Tenant @relation(fields:[tenantId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@id([tenantId,email])
+ @@map("members")
+}
+model Equipment {
+ tenantId String @map("tenantID")
+ id String
+ code String
+ name String
+ category String
+ qrInfo String @default("")
+ image String @default("")
+ location String @default("انبار تجهیزات")
+ approval String @default("pending")
+ expiry String?
+ created String
+ version Int @default(0)
+ tenant Tenant @relation(fields:[tenantId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ events Event[]
+ @@id([tenantId,id])
+ @@unique([tenantId,code],map:"equipment_tenant_code")
+ @@map("equipment")
+}
+model Event {
+ tenantId String @map("tenantID")
+ id String
+ equipmentId String @map("equipmentID")
+ kind String
+ destination String @default("")
+ reason String @default("")
+ condition String @default("")
+ result String @default("")
+ cycleId String? @map("cycleID")
+ actor String
+ at String
+ equipment Equipment @relation(fields:[tenantId,equipmentId],references:[tenantId,id],onDelete:NoAction,onUpdate:NoAction)
+ @@id([tenantId,id])
+ @@index([tenantId,equipmentId],map:"events_tenant_equipment")
+ @@map("events")
+}
+model AuthUser {
+ id String @id
+ email String @unique
+ name String
+ password String
+ platformAdmin Int @default(0) @map("platform_admin")
+ active Int @default(1)
+ created String
+ sessions AuthSession[]
+ @@map("auth_users")
+}
+model AuthSession {
+ tokenHash String @id @map("token_hash")
+ userId String @map("user_id")
+ expires BigInt
+ user AuthUser @relation(fields:[userId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+ @@index([expires],map:"auth_sessions_expiry")
+ @@map("auth_sessions")
+}
+model AuthAttempt {
+ key String @id
+ count Int
+ until BigInt
+ @@map("auth_attempts")
+}
+model AuthAudit {
+ id Int @id @default(autoincrement())
+ actor String
+ action String
+ target String
+ at String
+ @@map("auth_audit")
+}
+model SchemaMigration {
+ name String @id
+ hash String
+ applied String
+ @@map("schema_migrations")
+}

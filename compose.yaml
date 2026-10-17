@@ -1,0 +1,20 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:?Set PUBLIC_URL to your HTTPS domain}
+      DATABASE_URL: file:/app/data/steril-track.sqlite
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - steril-data:/app/data
+      - steril-backups:/app/backups
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  steril-data:
+  steril-backups:
