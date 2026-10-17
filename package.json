@@ -6,7 +6,6 @@
   "engines": {
     "node": ">=24 <25"
   },
-  "packageManager": "pnpm@11.25.0",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build --webpack",
@@ -21,10 +20,12 @@
     "test": "tsx tests/calendar.ts && tsx tests/seed.ts && tsx tests/upgrade.ts && tsx tests/integration.ts"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.0",
     "@tanstack/react-query": "5.104.3",
     "dotenv": "17.2.3",
     "lucide-react": "1.31.0",
     "next": "16.4.2",
+    "prisma": "^6.19.0",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
