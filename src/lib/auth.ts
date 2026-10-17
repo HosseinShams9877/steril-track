@@ -1,7 +1,8 @@
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {prisma} from './prisma';
-import {body,fail,json,publicOrigin,text,safely} from './http';
+import {body,fail,json,publicOrigin,text,safely} from './http'; // text اضافه شد
 import {passwordHash,verify} from './password';
+
 export type User={userId:string,email:string,displayName:string,isPlatformAdmin:boolean};
 const hash=(v:string)=>createHash('sha256').update(v).digest('hex');
 const token=(req:Request)=>req.headers.get('cookie')?.match(/(?:^|;\s*)steril_session=([a-f0-9]{64})(?:;|$)/)?.[1];
@@ -15,7 +16,6 @@ export const me=(req:Request)=>safely(async()=>json({user:await requireUser(req)
 export const login=(req:Request)=>safely(async()=>{
  const b=await body(req),email=text(b.email).toLowerCase();
  await limit('account:'+email,10);
- // Optional proxy rate limiting is handled by a trusted reverse proxy; untrusted IP headers are not used.
  const u=await prisma.authUser.findUnique({where:{email}});
  const good=await verify(b.password,u?.password||'0'.repeat(32)+':'+ '0'.repeat(128));
  if(!u||!u.active||!good){await audit(email,'login_failed');return json({error:'ایمیل یا رمز عبور نادرست است'},401)}

@@ -12,14 +12,12 @@ export async function api<T = any>(path: string, body?: unknown, signal?: AbortS
       : {}),
   });
 
-  // بررسی اینکه آیا پاسخ JSON است یا خیر (برای جلوگیری از خطای Unexpected token '<')
   const contentType = response.headers.get('content-type');
   let data: any = {};
   
   if (contentType && contentType.includes('application/json')) {
     data = await response.json();
   } else {
-    // اگر پاسخ HTML بود (مثلاً صفحه 404)، خطای متنی می‌دهیم
     const text = await response.text();
     throw new ApiError(`خطای سرور: پاسخ نامعتبر (${response.status})`, response.status);
   }
