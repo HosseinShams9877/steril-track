@@ -15,13 +15,13 @@ export default function App({sessionId}:{sessionId:string}){
  
  const query=useQuery({
    queryKey:['hospital',sessionId,tenant],
-   queryFn:({signal})=>api('/api/data'+(tenant?'?tenantId='+encodeURIComponent(tenant):''),undefined,signal)
+   queryFn:({signal})=>api('/service/data'+(tenant?'?tenantId='+encodeURIComponent(tenant):''),undefined,signal)
  });
  
  const data:any=query.data||{tenants:[],items:[],events:[],members:[]},loading=query.isPending;
  
  const mutation=useMutation({
-   mutationFn:(body:any)=>api('/api/data',body),
+   mutationFn:(body:any)=>api('/service/data',body),
    onSuccess:()=>qc.invalidateQueries({queryKey:['hospital',sessionId]})
  });
  
