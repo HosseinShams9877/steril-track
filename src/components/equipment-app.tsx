@@ -5,32 +5,71 @@ import {api} from '@/lib/api-client';
 import PersianCalendar from './persian-calendar';
 import {samePersianMonth,faDate,todayISO} from '../lib/persian-date';
 import {ScanBarcode,CalendarDays,Sparkles,Activity,LayoutDashboard,Package,ArrowLeftRight,ShieldCheck,FileBarChart,Users,Plus,Search,ChevronLeft,Building2,CheckCircle2,Clock,AlertTriangle,X,Download,LogOut} from 'lucide-react';
+
 const labels:any={ready:'آماده استفاده',pending:'در انتظار بررسی',unusable:'غیرقابل استفاده',create:'ثبت تجهیز',edit:'ویرایش مشخصات',out:'خروج تجهیز',return:'برگشت تجهیز',steril_start:'ارسال به استریلیزاسیون',steril_end:'پایان استریلیزاسیون',approve:'بررسی ادمین',passed:'موفق',failed:'ناموفق'};
 const date=(v:string)=>v?new Date(v).toLocaleString('fa-IR',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Tehran'}):'—';
+
 export default function App({sessionId}:{sessionId:string}){
  const [tenant,setTenant]=useState(''),[tab,setTab]=useState('dashboard'),[search,setSearch]=useState(''),[filter,setFilter]=useState(''),[modal,setModal]=useState(''),[selected,setSelected]=useState<any>(null),[form,setForm]=useState<any>({}),[error,setError]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[scanCode,setScanCode]=useState(''),[scanAction,setScanAction]=useState('detail');
  const qc=useQueryClient();
- const query=useQuery({queryKey:['hospital',sessionId,tenant],queryFn:({signal})=>api('/api/data'+(tenant?'?tenantId='+encodeURIComponent(tenant):''),undefined,signal)});
+ 
+ const query=useQuery({
+   queryKey:['hospital',sessionId,tenant],
+   queryFn:({signal})=>api('/api/data'+(tenant?'?tenantId='+encodeURIComponent(tenant):''),undefined,signal)
+ });
+ 
  const data:any=query.data||{tenants:[],items:[],events:[],members:[]},loading=query.isPending;
- const mutation=useMutation({mutationFn:(body:any)=>api('/api/data',body),onSuccess:()=>qc.invalidateQueries({queryKey:['hospital',sessionId]})});
+ 
+ const mutation=useMutation({
+   mutationFn:(body:any)=>api('/api/data',body),
+   onSuccess:()=>qc.invalidateQueries({queryKey:['hospital',sessionId]})
+ });
+ 
  async function load(){await qc.invalidateQueries({queryKey:['hospital',sessionId]})}
+ 
  useEffect(()=>{if(!tenant&&data.tenants.length)setTenant(data.tenants[0].id)},[data.tenants,tenant]);
+ 
  useEffect(()=>{if(query.error)setError(query.error.message)},[query.error]);
 
  const open=(m:string,item:any=null)=>{setModal(m);setSelected(item);setError('');setScanCode('');setForm(m==='edit'?{...item}:{destination:m==='steril_start'?'بخش استریلیزاسیون':m==='out'?'اتاق عمل':'انبار تجهیزات',result:'passed',approval:'pending',role:'operator'})};
- async function save(e:any){e.preventDefault();if(modal==='scan'){const code=scanCode.trim();const item=data.items?.find((i:any)=>i.code===code);if(!item){setScanCode('');setError('کد '+code+' در این بیمارستان ثبت نشده است. کد را بررسی یا تجهیز را ثبت کنید.');return}open(scanAction,item);setNotice('کد '+code+' شناسایی شد: '+item.name);return}setBusy(true);setError('');try{const d=await mutation.mutateAsync({...form,action:modal,id:selected?.id,tenantId:tenant});setModal('');setNotice('اطلاعات با موفقیت ثبت شد');if(modal==='createTenant')setTenant(d.id);else await load();}catch(e:any){setError(e.message)}finally{setBusy(false)}}
+ 
+ async function save(e:any){
+   e.preventDefault();
+   if(modal==='scan'){
+     const code=scanCode.trim();
+     const item=data.items?.find((i:any)=>i.code===code);
+     if(!item){setScanCode('');setError('کد '+code+' در این بیمارستان ثبت نشده است.');return}
+     open(scanAction,item);setNotice('کد '+code+' شناسایی شد: '+item.name);return
+   }
+   setBusy(true);setError('');
+   try{
+     const d=await mutation.mutateAsync({...form,action:modal,id:selected?.id,tenantId:tenant});
+     setModal('');setNotice('اطلاعات با موفقیت ثبت شد');
+     if(modal==='createTenant')setTenant(d.id);else await load();
+   }catch(e:any){setError(e.message)}finally{setBusy(false)}
+ }
+ 
  const items=data.items||[],events=data.events||[],activeTenant=data.tenants.find((t:any)=>t.id===tenant),admin=data.role==='admin';
  const visible=items.filter((i:any)=>(i.name+' '+i.code+' '+i.category).toLowerCase().includes(search.toLowerCase())&&(!filter||i.approval===filter));
  const count=(v:string)=>items.filter((i:any)=>i.approval===v).length;
  const hist=(id:string)=>events.filter((e:any)=>e.equipmentID===id);
  const cycles=(id:string)=>hist(id).filter((e:any)=>e.kind==='steril_end');
  const expired=items.filter((i:any)=>i.expiry&&i.expiry<todayISO());
- function csv(){const rows=[['کد','نام تجهیز','دسته‌بندی','محل فعلی','تأیید','چرخه استریلیزاسیون','ورود به اتاق عمل','آخرین استریلیزاسیون'],...visible.map((i:any)=>[i.code,i.name,i.category,i.location,labels[i.approval],cycles(i.id).length,hist(i.id).filter((e:any)=>e.kind==='out'&&e.destination==='اتاق عمل').length,cycles(i.id)[0]?.at||''])];const text='\uFEFF'+rows.map(r=>r.map((v:any)=>'"'+String(v).replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"').join(',')).join('\r\n');const u=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=u;a.download='equipment-report.csv';a.click();URL.revokeObjectURL(u)}
+ 
+ function csv(){
+   const rows=[['کد','نام تجهیز','دسته‌بندی','محل فعلی','تأیید','چرخه استریلیزاسیون','ورود به اتاق عمل','آخرین استریلیزاسیون'],...visible.map((i:any)=>[i.code,i.name,i.category,i.location,labels[i.approval],cycles(i.id).length,hist(i.id).filter((e:any)=>e.kind==='out'&&e.destination==='اتاق عمل').length,cycles(i.id)[0]?.at||''])];
+   const text='\uFEFF'+rows.map(r=>r.map((v:any)=>'"'+String(v).replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"').join(',')).join('\r\n');
+   const u=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=u;a.download='equipment-report.csv';a.click();URL.revokeObjectURL(u)
+ }
+ 
  const nav=[['dashboard','نمای کلی',LayoutDashboard],['equipment','تجهیزات جراحی',Package],['movements','ورود و خروج',ArrowLeftRight],['steril','استریلیزاسیون',ShieldCheck],['reports','آمار و گزارش‌ها',FileBarChart],...(admin?[['users','کاربران و دسترسی',Users]]:[])];
  const title:any={dashboard:'نمای کلی بیمارستان',equipment:'تجهیزات جراحی',movements:'گردش تجهیزات',steril:'مدیریت استریلیزاسیون',reports:'آمار و گزارش‌ها',users:'کاربران و سطح دسترسی'};
+ 
  const field=(name:string,label:string,type='text',required=true)=><label>{label}<input type={type} required={required} value={form[name]||''} onKeyDown={e=>{if(name==='code'&&e.key==='Enter'){e.preventDefault();setNotice('کد بارکدخوان در فرم ثبت شد')}}} onChange={e=>setForm({...form,[name]:e.target.value})}/></label>;
  const badge=(v:string)=><span className={'badge '+v}>{labels[v]||v}</span>;
+ 
  const table=<div className="table-wrap"><table><thead><tr><th>تجهیز / شناسه</th><th>دسته‌بندی</th><th>محل فعلی</th><th>وضعیت تأیید</th><th>چرخه‌ها</th><th></th></tr></thead><tbody>{visible.map((i:any)=><tr key={i.id} onClick={()=>open('detail',i)}><td><div className="equipment-cell">{i.image?<img src={i.image} alt=""/>:<span className="equip-icon"><Package size={20}/></span>}<div><b>{i.name}</b><small dir="ltr">{i.code}</small></div></div></td><td>{i.category}</td><td>{i.location}</td><td>{badge(i.approval)}</td><td>{cycles(i.id).length.toLocaleString('fa-IR')}</td><td><button className="icon" aria-label="مشاهده پرونده"><ChevronLeft size={18}/></button></td></tr>)}</tbody></table>{!visible.length&&<div className="empty"><Package/><h3>{search||filter?'تجهیزی با این مشخصات پیدا نشد':'هنوز تجهیزی ثبت نشده است'}</h3><p>با ثبت اولین تجهیز، ردیابی و تاریخچه آن در این بخش آغاز می‌شود.</p>{admin&&<button onClick={()=>open('create')}><Plus size={16}/>ثبت اولین تجهیز</button>}</div>}</div>;
+ 
  return <div className="shell"><aside><a className="brand" href="/"><span><Activity/></span><div>استریل‌ترک<small>STERIL TRACK</small></div></a><div className="workspace"><Building2 size={20}/><div><small>فضای کاری بیمارستان</small><select aria-label="انتخاب بیمارستان" value={tenant} onChange={e=>{setTenant(e.target.value);setTab('dashboard');setSearch('');setFilter('')}}>{!data.tenants.length&&<option>انتخاب بیمارستان</option>}{data.tenants.map((t:any)=><option key={t.id} value={t.id}>{t.name}</option>)}</select></div></div><p className="nav-label">مدیریت و پایش</p><nav>{nav.map(([id,label,Icon]:any)=><button key={id} className={tab===id?'active':''} onClick={()=>{setTab(id);setFilter('');setSearch('')}}><Icon size={20}/>{label}{id==='equipment'&&<small>{items.length.toLocaleString('fa-IR')}</small>}</button>)}</nav><div className="side-bottom"><div className="secure"><ShieldCheck size={20}/><div>هر تجهیز، یک تاریخچه<small>ردیابی دقیق از ثبت تا استفاده</small></div></div>{data.user?.isPlatformAdmin&&<button className="tenant-add" onClick={()=>open('createTenant')}><Plus size={16}/>افزودن بیمارستان</button>}<div className="profile"><span>{data.user?.name?.slice(0,1)||'ک'}</span><div>{admin?'مدیر بیمارستان':'حساب کاربری'}<small>{data.user?.email||'ورود به سامانه'}</small></div></div></div></aside><main><header><div><span className="crumb">مدیریت تجهیزات <ChevronLeft size={12}/> {title[tab]}</span><h1>{title[tab]}</h1></div><div className="header-meta"><button className="scan-header" onClick={()=>open('scan')}><ScanBarcode size={18}/>بارکدخوان</button><span className="live-dot"/>سامانه ردیابی تجهیزات <span className="today">{new Date().toLocaleDateString('fa-IR',{month:'long',day:'numeric',year:'numeric',timeZone:'Asia/Tehran'})}</span></div></header>
  {notice&&<div className="notice flex items-center justify-between rounded-lg" role="status">{notice}<button className="icon" onClick={()=>setNotice('')}><X size={16}/></button></div>}{error&&!modal&&<div className="error" role="alert">{error} <a href="/">ورود مجدد به حساب</a></div>}
  {!tenant&&!loading?<section className="welcome"><ShieldCheck size={52}/><h2>ردیابی تجهیزات از همین‌جا آغاز می‌شود</h2><p>بیمارستان خود را ایجاد کنید، تجهیزات را ثبت کنید و تمام مراحل گردش و استریلیزاسیون را در یک پرونده دنبال کنید.</p>{data.user?.isPlatformAdmin?<button onClick={()=>open('createTenant')}><Plus size={18}/>ایجاد بیمارستان</button>:<p>برای دسترسی به بیمارستان با مدیر سامانه تماس بگیرید.</p>}</section>:<>
